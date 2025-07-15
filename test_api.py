@@ -11,7 +11,7 @@ import os
 # Configuration
 API_BASE_URL = "http://localhost:8000"
 TEST_UID = "test_123"
-TEST_AUDIO_FILE = "trump_audio.wav"  # Use the local audio file
+TEST_AUDIO_FILE = "/home/sergio/generative3d/trump_audio.wav"  # Use the local audio file
 
 async def test_api():
     async with httpx.AsyncClient() as client:
@@ -41,7 +41,7 @@ async def test_api():
         try:
             with open(TEST_AUDIO_FILE, "rb") as audio_file:
                 files = {"file": (TEST_AUDIO_FILE, audio_file, "audio/wav")}
-                data = {"uid": TEST_UID}
+                data = {"uid": TEST_UID, "language": "en"}
                 
                 response = await client.post(
                     f"{API_BASE_URL}/transcribe",

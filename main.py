@@ -2,11 +2,14 @@ import os
 import asyncio
 import aiofiles
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel
 import httpx
 from typing import Optional, Dict, Any
 import logging
+import fal_client
+from app import process
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,10 +24,6 @@ SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./output")
 # Ensure save folder exists
 os.makedirs(SAVE_FOLDER, exist_ok=True)
 
-class TranscriptionRequest(BaseModel):
-    uid: str
-    audio_url: str
-
 class StatusResponse(BaseModel):
     uid: str
     status: str
@@ -36,7 +35,7 @@ async def root():
     return {"message": "Text2Ture API is running"}
 
 @app.post("/transcribe", response_model=dict)
-async def transcribe_audio(request: TranscriptionRequest):
+async def transcribe_audio(file: UploadFile = File(...), uid: str = Form(...), language: str = Form(...)):
     """
     Transcribe audio using FAL's Whisper API
     """
@@ -44,7 +43,23 @@ async def transcribe_audio(request: TranscriptionRequest):
         raise HTTPException(status_code=500, detail="FAL_API_KEY not configured")
     
     try:
-        # Call FAL's Whisper API
+        os.makedirs("/data", exist_ok=True)
+        
+        # Save uploaded file temporarily
+        file_path = f"/data/audio_{uid}.wav"
+
+
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        logger.info(f"Saved uploaded file to {file_path} for UID: {uid}")
+
+        # Upload file to FAL
+        url = await fal_client.upload_file_async(file_path)
+        
+        logger.info(f"URL {url} for UID: {uid}")
+        # Call FAL's Whisper API with the uploaded file
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://fal.run/fal-ai/whisper",
@@ -53,7 +68,8 @@ async def transcribe_audio(request: TranscriptionRequest):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "audio_url": request.audio_url
+                    "audio_url": url,
+                    "language": language
                 },
                 timeout=60.0
             )
@@ -63,41 +79,27 @@ async def transcribe_audio(request: TranscriptionRequest):
                 raise HTTPException(status_code=response.status_code, detail="FAL API error")
             
             transcription_result = response.json()
-            logger.info(f"Transcription completed for UID: {request.uid}")
+            logger.info(f"Transcription completed for UID: {uid}")
             
-            # Wait for a few seconds (placeholder for future processing)
-            await asyncio.sleep(3)
+            # Clean up temporary file
+            os.remove(file_path)
             
-            # Save PBR material parameters to a JSON file with the UID as filename
-            # This is a placeholder - you can replace this with your actual processing logic
-            pbr_parameters = {
-                "albedo": [0.8, 0.2, 0.1],
-                "roughness": 0.3,
-                "metallic": 0.1,
-                "normal_strength": 1.0,
-                "emissive": [0.0, 0.0, 0.0],
-                "ao_strength": 1.0
-            }
-            file_path = os.path.join(SAVE_FOLDER, f"{request.uid}.json")
+            # Start processing in background task
+            asyncio.create_task(process(transcription_result, uid))
             
-            async with aiofiles.open(file_path, 'w') as f:
-                await f.write(json.dumps(pbr_parameters, indent=2))
-            
-            logger.info(f"Saved PBR parameters to {file_path}")
-            
+            # Return immediately with transcription result
             return {
-                "uid": request.uid,
-                "status": "completed",
+                "uid": uid,
+                "status": "processing",
                 "transcription": transcription_result.get("text", ""),
-                "file_path": file_path,
-                "pbr_parameters": pbr_parameters
+                "message": "Transcription completed. Processing started in background."
             }
             
     except httpx.TimeoutException:
-        logger.error(f"Timeout calling FAL API for UID: {request.uid}")
+        logger.error(f"Timeout calling FAL API for UID: {uid}")
         raise HTTPException(status_code=408, detail="Request timeout")
     except Exception as e:
-        logger.error(f"Error processing transcription for UID {request.uid}: {str(e)}")
+        logger.error(f"Error processing transcription for UID {uid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/status/{uid}", response_model=StatusResponse)
@@ -106,12 +108,24 @@ async def get_status(uid: str):
     Check the status of a transcription request by UID
     """
     file_path = os.path.join(SAVE_FOLDER, f"{uid}.json")
+    error_file_path = os.path.join(SAVE_FOLDER, f"{uid}_error.json")
+    
     file_exists = os.path.exists(file_path)
+    error_exists = os.path.exists(error_file_path)
     
-    status = "completed" if file_exists else "not_found"
-    pbr_parameters = None
-    
-    if file_exists:
+    if error_exists:
+        status = "error"
+        pbr_parameters = None
+        try:
+            async with aiofiles.open(error_file_path, 'r') as f:
+                content = await f.read()
+                error_info = json.loads(content)
+                logger.error(f"Error for UID {uid}: {error_info.get('error', 'Unknown error')}")
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Error reading error file {error_file_path}: {e}")
+    elif file_exists:
+        status = "completed"
+        pbr_parameters = None
         try:
             async with aiofiles.open(file_path, 'r') as f:
                 content = await f.read()
@@ -119,6 +133,9 @@ async def get_status(uid: str):
         except (json.JSONDecodeError, IOError) as e:
             logger.error(f"Error reading JSON file {file_path}: {e}")
             # If we can't read the JSON, still return that file exists but with None parameters
+    else:
+        status = "processing"
+        pbr_parameters = None
     
     return StatusResponse(
         uid=uid,
