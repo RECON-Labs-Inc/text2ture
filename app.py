@@ -19,23 +19,15 @@ async def process(transcription_result: Dict[str, Any], uid: str):
         transcription_text = transcription_result.get("text", "")
         logger.info(f"Processing transcription: {transcription_text[:100]}...")
         
-        # Simulate some processing time (replace with your actual processing logic)
-        await asyncio.sleep(5)  # Simulate 5 seconds of processing
         
-        # Your actual processing logic would go here
-        # For example: AI analysis, PBR parameter generation, etc.
         
-        # Generate PBR material parameters (placeholder)
-        pbr_parameters = {
-            "albedo": [0.8, 0.2, 0.1],
-            "roughness": 0.3,
-            "metallic": 0.1,
-            "normal_strength": 1.0,
-            "emissive": [0.0, 0.0, 0.0],
-            "ao_strength": 1.0,
-            "transcription": transcription_text
-        }
-        
+        await asyncio.sleep(5)
+        # The actual processing logic would go here
+        pbr_parameters = generate_pbr_parameters(transcription_text)
+
+        # For concurrent requests we might use:
+        # pbr_parameters = await asyncio.to_thread(generate_pbr_parameters, transcription_text)
+
         # Save results to file
         save_folder = os.getenv("SAVE_FOLDER", "./output")
         os.makedirs(save_folder, exist_ok=True)
@@ -55,5 +47,22 @@ async def process(transcription_result: Dict[str, Any], uid: str):
             await f.write(json.dumps({"error": str(e), "uid": uid}, indent=2))
 
 
+def generate_pbr_parameters(transcription_text: str) -> Dict[str, Any]:
+    """
+    Generate PBR material parameters based on the transcription text
+    """
+    # Your actual processing logic would go here
+    # Simulate some processing time (replace with your actual processing logic)
+    logger.info(f"Generating PBR parameters for {transcription_text[:100]}...")
 
 
+    
+    return {
+        "albedo": [0.8, 0.2, 0.1],
+        "roughness": 0.3,
+        "metallic": 0.1,
+        "normal_strength": 1.0,
+        "emissive": [0.0, 0.0, 0.0],
+        "ao_strength": 1.0,
+        "transcription": transcription_text
+    }
