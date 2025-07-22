@@ -21,7 +21,7 @@ async def submit_transcription(client, uid, language="en"):
             data = {"uid": uid, "language": language}
             
             response = await client.post(
-                f"{API_BASE_URL}/transcribe",
+                f"{API_BASE_URL}/a2pbr",
                 files=files,
                 data=data,
                 timeout=120.0

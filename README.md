@@ -1,110 +1,55 @@
-# Text2Ture API
+# a2pbr (Audio to PBR)
 
-A FastAPI server that transcribes audio using FAL's Whisper API and generates PBR material parameters.
+This API converts audio files to PBR (Physically Based Rendering) material parameters using FAL's Whisper API.
 
-## Setup
+## Endpoints
 
-1. Install dependencies:
+### Health Check
+- `GET /health`
+
+### Audio to PBR
+- `POST /a2pbr`
+  - Accepts: multipart/form-data with fields:
+    - `file`: audio file (wav, mp3, etc.)
+    - `uid`: unique identifier
+    - `language`: language code (e.g., 'en')
+  - Returns: JSON with PBR parameters and transcription
+
+### Status
+- `GET /status/{uid}`
+  - Returns: status and PBR parameters for the given UID
+
+## Example Usage
+
+```python
+import requests
+
+url = "http://localhost:8000/a2pbr"
+files = {"file": open("audio.wav", "rb")}
+data = {"uid": "test_123", "language": "en"}
+response = requests.post(url, files=files, data=data)
+print(response.json())
+```
+
+## Running the Service
+
+Build and run with Docker:
+
 ```bash
-pip install -r requirements.txt
+docker build -t a2pbr .
+docker run --rm -d -p 8000:8000 --env FAL_KEY=$FAL_KEY --name a2pbr a2pbr
 ```
 
-2. Set environment variables:
+## Testing
+
+Run the test scripts:
+
 ```bash
-export FAL_API_KEY="your_fal_api_key_here"
-export SAVE_FOLDER="./output"  # Optional, defaults to ./output
+python test_api.py
+python test_concurrent.py
 ```
-
-3. Run the server:
-```bash
-python main.py
-```
-
-Or with uvicorn directly:
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-## API Endpoints
-
-### POST /transcribe
-Transcribe audio using FAL's Whisper API.
-
-**Request Body:**
-```json
-{
-  "uid": "unique_identifier_123",
-  "audio_url": "https://example.com/audio.mp3"
-}
-```
-
-**Response:**
-```json
-{
-  "uid": "unique_identifier_123",
-  "status": "completed",
-  "transcription": "This is the transcribed text...",
-  "file_path": "./output/unique_identifier_123.json",
-  "pbr_parameters": {
-    "albedo": [0.8, 0.2, 0.1],
-    "roughness": 0.3,
-    "metallic": 0.1,
-    "normal_strength": 1.0,
-    "emissive": [0.0, 0.0, 0.0],
-    "ao_strength": 1.0
-  }
-}
-```
-
-### GET /status/{uid}
-Check the status of a transcription request.
-
-**Response:**
-```json
-{
-  "uid": "unique_identifier_123",
-  "status": "completed",
-  "file_exists": true,
-  "pbr_parameters": {
-    "albedo": [0.8, 0.2, 0.1],
-    "roughness": 0.3,
-    "metallic": 0.1,
-    "normal_strength": 1.0,
-    "emissive": [0.0, 0.0, 0.0],
-    "ao_strength": 1.0
-  }
-}
-```
-
-### GET /health
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "fal_api_key_configured": true,
-  "save_folder": "./output"
-}
-```
-
-## Environment Variables
-
-- `FAL_API_KEY`: Your FAL API key (required)
-- `SAVE_FOLDER`: Directory to save output files (optional, defaults to `./output`)
-
-## Features
-
-1. **Audio Transcription**: Uses FAL's Whisper API to transcribe audio from URLs
-2. **PBR Parameter Generation**: Generates PBR material parameters based on audio content
-3. **Status Tracking**: Each request is tracked by a unique UID
-4. **JSON Output**: Saves PBR parameters to JSON files named with the UID
-5. **Async Processing**: Non-blocking API calls with proper error handling
-6. **Health Monitoring**: Built-in health check endpoint
 
 ## Notes
-
-- The server waits 3 seconds after transcription as a placeholder for future processing
-- Currently saves placeholder PBR parameters to JSON files - replace this with your actual processing logic
-- All output files are saved in the directory specified by `SAVE_FOLDER` environment variable
-- The API includes comprehensive error handling and logging 
+- The `/a2pbr` endpoint replaces the previous `/transcribe` endpoint.
+- The service is designed for concurrent requests and background processing.
+- See the code for more details on error handling and status tracking. 
