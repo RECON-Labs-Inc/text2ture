@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-async def process(transcription_result: Dict[str, Any], uid: str):
+async def process(input_data: Dict[str, Any], uid: str):
     """
     Background processing function for transcription results
     This runs asynchronously and doesn't block the main API
@@ -16,13 +16,12 @@ async def process(transcription_result: Dict[str, Any], uid: str):
         logger.info(f"Starting background processing for UID: {uid}")
         
         # Get the transcription text and additional parameters
-        transcription_text = transcription_result.get("text", "")
-        sd_inference_steps = transcription_result.get("sd_inference_steps", 30)
-        pre_prompt = transcription_result.get("pre_prompt", "")
-        post_prompt = transcription_result.get("post_prompt", "")
+        transcription_text = input_data.get("text", "")
+        inference_params = input_data.get("inference_params", {})
+        custom_arg = input_data.get("custom_arg", None)
         
         logger.info(f"Processing transcription: {transcription_text[:100]}")
-        logger.info(f"Parameters: sd_inference_steps={sd_inference_steps}, pre_prompt={pre_prompt}, post_prompt={post_prompt}")
+        logger.info(f"Parameters: inference_params={inference_params}, custom_arg={custom_arg}")
         
         await asyncio.sleep(2)  # Simulate processing
 
@@ -31,18 +30,29 @@ async def process(transcription_result: Dict[str, Any], uid: str):
         uid_dir = os.path.join(save_folder, uid)
         os.makedirs(uid_dir, exist_ok=True)
 
+        # Parse custom_arg to get selected objects
+        all_objects = []
+        if custom_arg:
+            try:
+                custom_arg_dict = json.loads(custom_arg)
+                # Get all objects from the custom_arg
+                all_objects = list(custom_arg_dict.keys())
+                logger.info(f"All objects: {all_objects}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing custom_arg JSON: {e}")
+                all_objects = []
+
         # Build the mapping of object names to URLs
         object_files = {}
-        object_names = ["sofa", "chair", "table", "lamp", "plant"]
-        for name in object_names:
-            filename = f"{name}.png"
+        for obj_name in all_objects:
+            filename = f"{obj_name}.png"
             file_path = os.path.join(uid_dir, filename)
             # Write dummy content
             async with aiofiles.open(file_path, 'w') as f:
-                await f.write(f"This is dummy data for {name} of UID {uid}.\n")
-            object_files[name] = f"/objects/{uid}/{filename}"
+                await f.write(f"This is dummy data for {obj_name} of UID {uid}.\n")
+            object_files[obj_name] = f"/objects/{uid}/{filename}"
 
-        # Save the mapping as the result JSON file (this is now the completion flag)
+        # Save the mapping as the result JSON file (this is the completion flag)
         output_file_path = os.path.join(uid_dir, f"{uid}.json")
         async with aiofiles.open(output_file_path, 'w') as f:
             await f.write(json.dumps(object_files, indent=2))

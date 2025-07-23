@@ -36,26 +36,32 @@ async def root():
     return {"message": "Text2Ture API is running"}
 
 @app.post("/a2pbr", response_model=dict)
-async def a2pbr(text: str = Form(...), uid: str = Form(...), sd_inference_steps: int = Form(30), pre_prompt: str = Form(""), post_prompt: str = Form("")):
+async def a2pbr(text: str = Form(...), uid: str = Form(...), inference_params: str = Form("{}"), custom_arg: str = Form(None)):
     """
     Convert transcribed text to PBR parameters
     """
     try:
         logger.info(f"Received text request for UID: {uid}")
         logger.info(f"Text: {text[:100]}")
-        logger.info(f"Parameters: sd_inference_steps={sd_inference_steps}, pre_prompt={pre_prompt}, post_prompt={post_prompt}")
+        logger.info(f"Parameters: inference_params={inference_params}, custom_arg={custom_arg}")
+        
+        # Parse inference_params JSON
+        try:
+            inference_params_dict = json.loads(inference_params) if inference_params else {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing inference_params JSON: {e}")
+            inference_params_dict = {}
         
         # Create transcription result structure similar to what FAL would return
-        transcription_result = {
+        input_data = {
             "text": text,
             "uid": uid,
-            "sd_inference_steps": sd_inference_steps,
-            "pre_prompt": pre_prompt,
-            "post_prompt": post_prompt
+            "inference_params": inference_params_dict,
+            "custom_arg": custom_arg
         }
-        
+        print(input_data)
         # Start processing in background task
-        asyncio.create_task(process(transcription_result, uid))
+        asyncio.create_task(process(input_data, uid))
         
         # Return immediately
         return {
