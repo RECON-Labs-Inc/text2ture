@@ -44,12 +44,17 @@ async def process(input_data: Dict[str, Any], uid: str):
 
         # Build the mapping of object names to URLs
         object_files = {}
+        sample_image_path = os.path.join(os.path.dirname(__file__), "sample_image.jpg")
         for obj_name in all_objects:
-            filename = f"{obj_name}.png"
+            filename = f"{obj_name}.jpg"
             file_path = os.path.join(uid_dir, filename)
-            # Write dummy content
-            async with aiofiles.open(file_path, 'w') as f:
-                await f.write(f"This is dummy data for {obj_name} of UID {uid}.\n")
+            # Copy the sample image as the dummy image
+            try:
+                async with aiofiles.open(sample_image_path, 'rb') as src, aiofiles.open(file_path, 'wb') as dst:
+                    content = await src.read()
+                    await dst.write(content)
+            except Exception as e:
+                logger.error(f"Error copying sample image for {obj_name}: {e}")
             object_files[obj_name] = f"/objects/{uid}/{filename}"
 
         # Save the mapping as the result JSON file (this is the completion flag)

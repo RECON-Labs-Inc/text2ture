@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY app.py .
+COPY sample_image.jpg .
 
 # Create output directory
 RUN mkdir -p /app/output

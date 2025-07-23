@@ -1,33 +1,63 @@
-# a2pbr (Audio to PBR)
+# Text2Ture API
 
-This API converts audio files to PBR (Physically Based Rendering) material parameters using FAL's Whisper API.
+This API converts text, audio, and images to PBR (Physically Based Rendering) material parameters and 3D mesh objects.
 
 ## Endpoints
 
 ### Health Check
 - `GET /health`
 
-### Audio to PBR
+### Audio to PBR (a2pbr)
 - `POST /a2pbr`
   - Accepts: multipart/form-data with fields:
-    - `file`: audio file (wav, mp3, etc.)
+    - `text`: transcribed text content
     - `uid`: unique identifier
-    - `language`: language code (e.g., 'en')
-  - Returns: JSON with PBR parameters and transcription
+    - `inference_params`: JSON string with inference parameters (float, int, string)
+    - `custom_arg`: JSON string with object selection data (optional)
+  - Returns: JSON with processing status and UID
+
+### Text to Mesh
+- `POST /text_to_mesh`
+  - Accepts: multipart/form-data with fields:
+    - `text`: input text content
+    - `uid`: unique identifier
+    - `inference_params`: JSON string with inference parameters
+  - Returns: JSON with processing status and UID
 
 ### Status
 - `GET /status/{uid}`
-  - Returns: status and PBR parameters for the given UID
+  - Returns: status and object files mapping for the given UID
 
 ## Example Usage
 
+### Audio to PBR
 ```python
 import requests
+import json
 
 url = "http://localhost:8000/a2pbr"
-files = {"file": open("audio.wav", "rb")}
-data = {"uid": "test_123", "language": "en"}
-response = requests.post(url, files=files, data=data)
+inference_params = {
+    "floatParam": 0.5,
+    "intParam": 30,
+    "stringParam": "default"
+}
+custom_arg = {
+    "Table": 0,
+    "Chair1": 0,
+    "Chair2": 1,
+    "Chair3": 0,
+    "Chair4": 0,
+    "Carpet": 0,
+    "Wall": 0
+}
+
+data = {
+    "text": "Create a wooden table with a modern design",
+    "uid": "test_123",
+    "inference_params": json.dumps(inference_params),
+    "custom_arg": json.dumps(custom_arg)
+}
+response = requests.post(url, data=data)
 print(response.json())
 ```
 
@@ -36,8 +66,15 @@ print(response.json())
 Build and run with Docker:
 
 ```bash
-docker build -t a2pbr .
-docker run --rm -d -p 8000:8000 --env FAL_KEY=$FAL_KEY --name a2pbr a2pbr
+docker build -t text2ture .
+docker run --rm -d -p 8000:8000 --env SAVE_FOLDER=/app/output --name text2ture text2ture
+```
+
+Or run directly with Python:
+
+```bash
+pip install -r requirements.txt
+python main.py
 ```
 
 ## Testing
@@ -50,6 +87,8 @@ python test_concurrent.py
 ```
 
 ## Notes
-- The `/a2pbr` endpoint replaces the previous `/transcribe` endpoint.
-- The service is designed for concurrent requests and background processing.
+- The service processes requests asynchronously in the background
+- Object files are generated based on the `custom_arg` object selection data
+- Status can be checked using the `/status/{uid}` endpoint
+- Generated files are served from the `/objects` static endpoint
 - See the code for more details on error handling and status tracking. 
