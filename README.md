@@ -16,14 +16,6 @@ This API converts text, audio, and images to PBR (Physically Based Rendering) ma
     - `custom_arg`: JSON string with object selection data (optional)
   - Returns: JSON with processing status and UID
 
-### Text to Mesh
-- `POST /text_to_mesh`
-  - Accepts: multipart/form-data with fields:
-    - `text`: input text content
-    - `uid`: unique identifier
-    - `inference_params`: JSON string with inference parameters
-  - Returns: JSON with processing status and UID
-
 ### Status
 - `GET /status/{uid}`
   - Returns: status and object files mapping for the given UID
